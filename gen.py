@@ -3,6 +3,33 @@ from bs4 import BeautifulSoup
 from stackapi import StackAPI
 import json
 from math import floor
+import re
+import requests
+
+
+
+THREE_FOUR_SIX = 346
+FOUR_HUNDRED = 400
+
+def hex_to_rgb(s):
+    r = int(s[1:3],16)
+    g = int(s[3:5],16)
+    b = int(s[5:7],16)
+    return str([r,g,b])
+
+def rgb_to_hex(arr):
+    s = "#"
+    for i in arr:
+        s += hex(i)[2:].zfill(2)
+    return s
+
+def gen_colors(s):
+    primary = "#" + format(hash(s) % 16777215,'x').zfill(6)
+    data = '{"input":['+str(hex_to_rgb(primary))+',"N","N","N","N","N","N","N","N","N"],"model":"default"}'
+    response = requests.post('http://colormind.io/api/', data=data).text.strip()
+    complimentary = eval(response)['result'][hash(s)%4+1]
+    secondary = rgb_to_hex(complimentary)
+    return primary, secondary
 
 
 def get_data(question_id):
@@ -14,25 +41,21 @@ def get_data(question_id):
                         filter='!*SU8CGYZitCB.D*(BDVIficKj7nFMLLDij64nVID)N9aK3GmR9kT4IzT*5iO_1y3iZ)6W.G*')
 
     for answer in answers["items"]:
-
         soup = BeautifulSoup(answer["body"], features="lxml")
+        if soup.html.body.h1:
+            title = soup.html.body.h1.text
+        elif soup.html.body.h2:
+            title = soup.html.body.h2.text
+        elif soup.html.body.p:
+            title = soup.html.body.p.text
+        else:break
+        finds = re.findall(r".+[\,\-\:\s]{0,3}\d+[\d\s]*(?:\s(?i)byte(?:s)?)?",title)[0]
+        score = finds.split()[-1]
+        name = re.split(r"[\,\-\:]",finds)[0].strip()
         try:
-            title = soup.body.h1.text
+            data[name] = str(floor(int(score) // int(score) > -1))
         except:pass
-        try:
-            parts = title.split(",")
-            parts_ = []
-            count = 0
-            for i in parts:
-                if count:
-                    parts_.extend(i.split())
-                else:
-                    count = 1
-            bytecount = str(min([int(i) for i in parts_ if i.isnumeric()]))
-            data[parts[0]] = bytecount
-        except:pass
-        
-
+            
     return data
 
 
@@ -46,8 +69,7 @@ def get_offset(n):
         current_count += 1
 
         if current_count == n + 1:
-            y = current_max
-            x = current_n
+            y, x = current_max, current_n
             break
         if current_n == current_max:
             current_max += 1
@@ -60,31 +82,33 @@ def add_lang(draw,n,max_n,name,lang_data):
     try:
         data = lang_data["languages"][name]
     except:
+        primary, secondary = gen_colors(name)
         data = {
-            "primary color":"#ffffff",
-            "secondary color":"#000000",
+            "primary color":primary,
+            "secondary color":secondary,
             "font":"ArialUnicodeMS"
         }
+    
+     
     column, row, _ = get_offset(n)
 
-    x = 346*2 * column + 346 * (max_n - row)
-    y = 600 * row
+    x = THREE_FOUR_SIX*2 * column + THREE_FOUR_SIX * (max_n - row)
+    y = FOUR_HUNDRED*1.5 * row
     size = 1
-    
     try:
         font_name = data["font"]
-        font = ImageFont.truetype(f"fonts/{font_name}.ttf",size=size)
+        font = ImageFont.truetype(f"fonts/{font_name}/{font_name}.ttf",size=size)
     except:
         font_name = "ArialUnicodeMS"
-        font = ImageFont.truetype("fonts/ArialUnicodeMS.ttf",size=size)
+        font = ImageFont.truetype("fonts/ArialUnicodeMS/ArialUnicodeMS.ttf",size=size)
 
-    draw.polygon([(692+x,200+y),(346+x,y),(x,200+y),(x,600+y),(346+x,800+y),(692+x,600+y)],fill=data["primary color"])
-    while ((font.getsize(name)[0] < 650) and (font.getsize(name)[1] < 370)):
+    draw.polygon([(THREE_FOUR_SIX*2+x,FOUR_HUNDRED//2+y),(THREE_FOUR_SIX+x,y),(x,FOUR_HUNDRED//2+y),(x,FOUR_HUNDRED*1.5+y),(THREE_FOUR_SIX+x,FOUR_HUNDRED*2+y),(THREE_FOUR_SIX*2+x,FOUR_HUNDRED*1.5+y)],fill=data["primary color"])
+    while ((font.getsize(name)[0] < THREE_FOUR_SIX*1.6) and (font.getsize(name)[1] < FOUR_HUNDRED*1.6)):
         size += 1
-        font = ImageFont.truetype(f"fonts/{font_name}.ttf",size=size)
+        font = ImageFont.truetype(f"fonts/{font_name}/{font_name}.ttf",size=size)
 
     size = floor(size*0.9)
-    font = ImageFont.truetype(f"fonts/{font_name}.ttf",size=size)
+    font = ImageFont.truetype(f"fonts/{font_name}/{font_name}.ttf",size=size)
 
     
     w, h = font.getsize(name)
@@ -96,7 +120,7 @@ def add_lang(draw,n,max_n,name,lang_data):
     w += offset_x
     h += offset_y
 
-    coords = (x+(346-w//2),y+400-h//2)#-floor(h*0.15))
+    coords = (x+(THREE_FOUR_SIX-w//2),y+FOUR_HUNDRED-h//2)#-floor(h*0.15))
     #draw.rectangle([coords,(coords[0]+w,coords[1]+h)],fill="#00000000",outline="yellow",width=2)
     draw.text(coords,name,fill=data["secondary color"],font=font)
     #draw.line([(coords[0],coords[1]+h//2),(coords[0]+w,coords[1]+h//2)],fill=(255,0,255),width=2)
@@ -107,7 +131,7 @@ if __name__ == "__main__":
     
     
 
-    data = get_data(58615)
+    data = get_data(219109)
     '''
     data = {
         "05AB1E":"6",
@@ -128,7 +152,10 @@ if __name__ == "__main__":
         "x86-16 machine code":"130",
         "PowerShell":"129",
         "asm2bf":"136",
-        "naz":"158"
+        "naz":"158",
+        "Seed":"194",
+        "Pyth":"12",
+        "><>":"100"
     }
     '''
     sorted_data = {k: v for k, v in sorted(data.items(), key=lambda item: int(item[1]))}
